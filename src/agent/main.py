@@ -138,7 +138,7 @@ When using tools, explain what you're doing and why."""
 
 
 @click.group()
-@click.version_option(version="0.1.0")
+@click.version_option(version="0.2.0")
 def cli():
     """My Agent - AI Agent with Agent Loop
 
@@ -151,12 +151,13 @@ def cli():
 @click.option("--provider", "-p", default="openai", help="LLM provider (openai, deepseek, anthropic, ollama)")
 @click.option("--model", "-m", default=None, help="Model to use (uses provider default if not specified)")
 @click.option("--enable-tools", "-t", is_flag=True, help="Enable tool calling")
-def chat(provider: str, model: str, enable_tools: bool):
+@click.option("--stream", "-s", is_flag=True, help="Enable streaming output")
+def chat(provider: str, model: str, enable_tools: bool, stream: bool):
     """Start interactive chat mode"""
     console.print(
         Panel(
             f"[bold green]My Agent - Interactive Chat[/bold green]\n"
-            f"[dim]Provider: {provider} | Type 'exit' or 'quit' to end[/dim]",
+            f"[dim]Provider: {provider} | Stream: {'on' if stream else 'off'} | Type 'exit' or 'quit' to end[/dim]",
             title="Welcome",
         )
     )
@@ -182,11 +183,23 @@ def chat(provider: str, model: str, enable_tools: bool):
                 continue
 
             # Run agent
-            console.print("\n[bold green]Agent:[/bold green]")
-            response = asyncio.run(agent.run(user_input))
+            console.print("\n[bold green]Agent:[/bold green] ", end="")
 
-            # Display response
-            console.print(Markdown(response))
+            if stream:
+                # Streaming output
+                async def stream_response():
+                    async for chunk in agent.run_stream(user_input):
+                        if isinstance(chunk, dict):
+                            # Tool call info
+                            continue
+                        console.print(chunk, end="", highlight=False)
+                    console.print()  # New line after streaming
+
+                asyncio.run(stream_response())
+            else:
+                # Non-streaming output
+                response = asyncio.run(agent.run(user_input))
+                console.print(Markdown(response))
 
         except KeyboardInterrupt:
             console.print("\n\n[yellow]Interrupted. Type 'exit' to quit.[/yellow]")
@@ -199,10 +212,11 @@ def chat(provider: str, model: str, enable_tools: bool):
 @click.option("--provider", "-p", default="openai", help="LLM provider (openai, deepseek, anthropic, ollama)")
 @click.option("--model", "-m", default=None, help="Model to use")
 @click.option("--enable-tools", "-t", is_flag=True, help="Enable tool calling")
-def ask(prompt: str, provider: str, model: str, enable_tools: bool):
+@click.option("--stream", "-s", is_flag=True, help="Enable streaming output")
+def ask(prompt: str, provider: str, model: str, enable_tools: bool, stream: bool):
     """Execute a single query"""
     console.print(f"[bold blue]Query:[/bold blue] {prompt}")
-    console.print(f"[dim]Provider: {provider}[/dim]\n")
+    console.print(f"[dim]Provider: {provider} | Stream: {'on' if stream else 'off'}[/dim]\n")
 
     try:
         agent = create_agent(provider, model, enable_tools)
@@ -211,9 +225,22 @@ def ask(prompt: str, provider: str, model: str, enable_tools: bool):
 
     # Run agent
     try:
-        response = asyncio.run(agent.run(prompt))
-        console.print("\n[bold green]Response:[/bold green]")
-        console.print(Markdown(response))
+        console.print("[bold green]Response:[/bold green] ", end="")
+
+        if stream:
+            # Streaming output
+            async def stream_response():
+                async for chunk in agent.run_stream(prompt):
+                    if isinstance(chunk, dict):
+                        continue
+                    console.print(chunk, end="", highlight=False)
+                console.print()
+
+            asyncio.run(stream_response())
+        else:
+            # Non-streaming output
+            response = asyncio.run(agent.run(prompt))
+            console.print(Markdown(response))
     except Exception as e:
         console.print(f"[red]Error: {str(e)}[/red]")
 
@@ -241,7 +268,7 @@ def providers():
 @cli.command()
 def version():
     """Show version information"""
-    console.print("[bold]My Agent[/bold] v0.1.0")
+    console.print("[bold]My Agent[/bold] v0.2.0")
 
 
 if __name__ == "__main__":

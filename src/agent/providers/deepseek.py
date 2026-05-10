@@ -79,6 +79,7 @@ class DeepSeekProvider(LLMProvider):
             "model": self.model,
             "messages": messages,
             "stream": True,
+            "extra_body": {"thinking": {"type": "disabled"}},
         }
 
         if tools:
@@ -86,8 +87,56 @@ class DeepSeekProvider(LLMProvider):
 
         stream = await self.client.chat.completions.create(**kwargs)
 
+        # 收集工具调用
+        tool_calls = {}
+        tool_calls_sent = False
+
         async for chunk in stream:
-            if chunk.choices:
-                delta = chunk.choices[0].delta
-                if delta.content:
-                    yield delta.content
+            if not chunk.choices:
+                continue
+
+            delta = chunk.choices[0].delta
+
+            # 处理文本内容
+            if delta.content:
+                yield delta.content
+
+            # 处理工具调用
+            if delta.tool_calls:
+                for tc in delta.tool_calls:
+                    idx = tc.index
+                    if idx not in tool_calls:
+                        tool_calls[idx] = {
+                            "id": tc.id or "",
+                            "type": "function",
+                            "function": {"name": "", "arguments": ""}
+                        }
+
+                    if tc.id:
+                        tool_calls[idx]["id"] = tc.id
+                    if tc.function:
+                        if tc.function.name:
+                            tool_calls[idx]["function"]["name"] = tc.function.name
+                        if tc.function.arguments:
+                            tool_calls[idx]["function"]["arguments"] += tc.function.arguments
+
+            # 检查是否结束
+            if chunk.choices[0].finish_reason == "tool_calls" and tool_calls and not tool_calls_sent:
+                # 解析工具调用参数
+                parsed_calls = []
+                for idx in sorted(tool_calls.keys()):
+                    tc = tool_calls[idx]
+                    try:
+                        args = json.loads(tc["function"]["arguments"])
+                    except (json.JSONDecodeError, TypeError):
+                        args = {}
+                    parsed_calls.append({
+                        "id": tc["id"],
+                        "type": "function",
+                        "function": {
+                            "name": tc["function"]["name"],
+                            "arguments": args
+                        }
+                    })
+                yield {"type": "tool_calls", "tool_calls": parsed_calls}
+                tool_calls_sent = True

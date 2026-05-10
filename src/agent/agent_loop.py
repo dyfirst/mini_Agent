@@ -1,6 +1,6 @@
 """Agent Loop - Core logic for AI Agent"""
 
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, AsyncGenerator
 
 from .conversation import Conversation
 from .providers.base import LLMProvider, LLMResponse
@@ -116,3 +116,68 @@ class AgentLoop:
     def clear_conversation(self):
         """Clear conversation history (except system prompt)"""
         self.conversation.clear()
+
+    async def run_stream(self, user_input: str) -> AsyncGenerator[str, None]:
+        """Process user input and stream response
+
+        Args:
+            user_input: User's input message
+
+        Yields:
+            Chunks of the response
+        """
+        # Add user message to conversation
+        self.conversation.add_user_message(user_input)
+
+        # Agent loop
+        iterations = 0
+        while iterations < self.max_iterations:
+            iterations += 1
+
+            # Get streaming response from LLM
+            messages = self.conversation.get_messages_for_api()
+            tools = self.tools.get_tool_definitions() if self.tools else None
+
+            full_response = ""
+            tool_calls_data = []
+
+            async for chunk in self.provider.stream_chat(messages=messages, tools=tools):
+                if isinstance(chunk, dict) and chunk.get("type") == "tool_calls":
+                    # Handle tool calls
+                    tool_calls_data = chunk.get("tool_calls", [])
+                else:
+                    # Regular text content
+                    full_response += chunk
+                    yield chunk
+
+            # If there are tool calls, process them
+            if tool_calls_data:
+                self.conversation.add_assistant_message(tool_calls=tool_calls_data)
+
+                # Execute each tool call
+                for tc in tool_calls_data:
+                    result = await self.tools.execute(
+                        name=tc["function"]["name"],
+                        arguments=tc["function"]["arguments"],
+                    )
+
+                    # Add tool result to conversation
+                    self.conversation.add_tool_result(
+                        tool_call_id=tc["id"],
+                        content=result,
+                    )
+
+                    # Yield tool execution info
+                    yield f"\n[Tool: {tc['function']['name']}]\n"
+
+                # Continue loop to get next response
+                continue
+
+            # No tool calls, save response and return
+            if full_response:
+                self.conversation.add_assistant_message(content=full_response)
+
+            return
+
+        # Max iterations reached
+        yield "\nMaximum iterations reached. Stopping."
