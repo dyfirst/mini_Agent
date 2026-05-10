@@ -1,6 +1,10 @@
 """测试 Shell 工具"""
 import asyncio
+import sys
 from src.agent.tools import ShellTool
+
+# 设置控制台编码
+sys.stdout.reconfigure(encoding='utf-8')
 
 
 async def test_basic_command():
@@ -13,7 +17,7 @@ async def test_basic_command():
 
     assert "Hello World" in result
 
-    print("✅ 基本命令测试通过")
+    print("[OK] 基本命令测试通过")
 
 
 async def test_list_command():
@@ -26,7 +30,7 @@ async def test_list_command():
 
     assert "src" in result or "tests" in result
 
-    print("✅ 列表命令测试通过")
+    print("[OK] 列表命令测试通过")
 
 
 async def test_timeout():
@@ -38,11 +42,11 @@ async def test_timeout():
     print(f"超时结果: {result}")
 
     # 注意：这个测试可能需要调整，取决于系统
-    print("✅ 超时测试完成")
+    print("[OK] 超时测试完成")
 
 
 if __name__ == "__main__":
     asyncio.run(test_basic_command())
     asyncio.run(test_list_command())
     # asyncio.run(test_timeout())  # 可选：取消注释以测试超时
-    print("\n✅ 所有 Shell 工具测试通过")
+    print("\n[OK] 所有 Shell 工具测试通过")

@@ -1,7 +1,11 @@
 """测试文件操作工具"""
 import asyncio
 import os
+import sys
 from src.agent.tools import ReadFileTool, WriteFileTool, ListDirectoryTool
+
+# 设置控制台编码
+sys.stdout.reconfigure(encoding='utf-8')
 
 
 async def test_write_and_read():
@@ -26,7 +30,7 @@ async def test_write_and_read():
     # 清理
     os.remove(test_file)
 
-    print("✅ 文件写入/读取测试通过")
+    print("[OK] 文件写入/读取测试通过")
 
 
 async def test_list_directory():
@@ -39,7 +43,7 @@ async def test_list_directory():
     assert "src" in result
     assert "tests" in result
 
-    print("✅ 目录列出测试通过")
+    print("[OK] 目录列出测试通过")
 
 
 async def test_read_nonexistent():
@@ -51,11 +55,11 @@ async def test_read_nonexistent():
 
     assert "Error" in result or "not found" in result
 
-    print("✅ 读取不存在文件测试通过")
+    print("[OK] 读取不存在文件测试通过")
 
 
 if __name__ == "__main__":
     asyncio.run(test_write_and_read())
     asyncio.run(test_list_directory())
     asyncio.run(test_read_nonexistent())
-    print("\n✅ 所有文件工具测试通过")
+    print("\n[OK] 所有文件工具测试通过")
