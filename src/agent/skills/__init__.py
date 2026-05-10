@@ -1,0 +1,2 @@
+"""Skills extension module"""
+
