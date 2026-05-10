@@ -29,3 +29,6 @@ htmlcov/
 
 # Type checking
 .mypy_cache/
+
+# MCP config (may contain sensitive data)
+mcp_config.json
