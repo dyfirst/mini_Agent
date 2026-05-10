@@ -7,6 +7,7 @@ Custom AI Agent with Agent Loop implementation.
 - CLI interface for interactive AI conversations
 - Agent Loop with tool calling support
 - Streaming output (typewriter effect)
+- Skills system (predefined task templates)
 - Multiple LLM provider support (OpenAI, DeepSeek, Anthropic, Ollama)
 - File operations (read, write, list)
 - Shell command execution
@@ -61,6 +62,13 @@ agent ask "Hello" --provider deepseek --model deepseek-v4-flash
 # Streaming output (typewriter effect)
 agent ask "Hello" --provider deepseek --stream
 agent chat --provider deepseek --stream --enable-tools
+
+# List available skills
+agent skills
+
+# Run a skill
+agent run-skill explain "什么是递归" --provider deepseek --stream
+agent run-skill review_code "src/main.py" --provider deepseek
 ```
 
 ## Available Providers
