@@ -6,6 +6,7 @@ Custom AI Agent with Agent Loop implementation.
 
 - CLI interface for interactive AI conversations
 - Agent Loop with tool calling support
+- Multiple LLM provider support (OpenAI, DeepSeek, Anthropic, Ollama)
 - File operations (read, write, list)
 - Shell command execution
 - Extensible tool system
@@ -21,43 +22,100 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -e .
 ```
 
+## Configuration
+
+Set API keys for the LLM provider you want to use:
+
+```bash
+# DeepSeek (recommended)
+export DEEPSEEK_API_KEY="your-deepseek-key"
+
+# OpenAI
+export OPENAI_API_KEY="your-openai-key"
+
+# Anthropic
+export ANTHROPIC_API_KEY="your-anthropic-key"
+
+# Ollama - No API key needed (runs locally)
+```
+
 ## Usage
 
 ```bash
-# Interactive chat mode
-agent chat
+# List available providers
+agent providers
+
+# Interactive chat mode (default: openai)
+agent chat --provider deepseek
 
 # Single query
-agent ask "What is Python?"
+agent ask "What is Python?" --provider deepseek
 
 # Execute with tools
-agent chat --enable-tools
+agent chat --provider deepseek --enable-tools
+
+# Specify model
+agent ask "Hello" --provider deepseek --model deepseek-v4-flash
 ```
+
+## Available Providers
+
+| Provider | Environment Variable | Default Model |
+|----------|---------------------|---------------|
+| OpenAI | `OPENAI_API_KEY` | gpt-4 |
+| DeepSeek | `DEEPSEEK_API_KEY` | deepseek-v4-flash |
+| Anthropic | `ANTHROPIC_API_KEY` | claude-sonnet-4-20250514 |
+| Ollama | (none) | llama3 |
 
 ## Project Structure
 
 ```
 my-agent/
-├── src/agent/           # Main source code
-│   ├── main.py         # CLI entry point
-│   ├── agent_loop.py   # Agent Loop core
-│   ├── conversation.py # Conversation management
-│   ├── providers/      # LLM providers
-│   ├── tools/          # Tool implementations
-│   ├── mcp/            # MCP extension (optional)
-│   └── skills/         # Skills extension (optional)
-├── tests/              # Unit tests
-└── docs/               # Documentation
+├── src/agent/              # Main source code
+│   ├── main.py            # CLI entry point
+│   ├── agent_loop.py      # Agent Loop core
+│   ├── conversation.py    # Conversation management
+│   ├── providers/         # LLM providers
+│   │   ├── base.py        # Provider base class
+│   │   ├── openai.py      # OpenAI provider
+│   │   ├── deepseek.py    # DeepSeek provider
+│   │   ├── anthropic.py   # Anthropic provider
+│   │   └── ollama.py      # Ollama provider
+│   └── tools/             # Tool implementations
+│       ├── base.py        # Tool base class
+│       ├── registry.py    # Tool registry
+│       ├── file_ops.py    # File operations
+│       └── shell.py       # Shell commands
+├── tests/                 # Unit tests
+├── docs/                  # Documentation
+├── pyproject.toml         # Project configuration
+└── README.md              # This file
 ```
 
 ## Development
 
 ```bash
-# Run tests
-pytest
+# Run all tests
+python -m pytest tests/ -v
 
-# Format code
-black src/ tests/
+# Run specific test
+python -m pytest tests/test_agent.py -v
+
+# Run with coverage
+python -m pytest --cov=src --cov-report=term-missing
+```
+
+## Testing
+
+See [TEST_GUIDE.md](TEST_GUIDE.md) for detailed testing instructions.
+
+Quick test:
+```bash
+# Unit tests (no API key needed)
+python -m pytest tests/ -v
+
+# Integration test (needs API key)
+python -m src.agent.main ask "Hello" --provider deepseek
 ```
 
 ## License

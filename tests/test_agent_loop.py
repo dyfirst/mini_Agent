@@ -5,22 +5,34 @@ import sys
 import pytest
 from src.agent.agent_loop import AgentLoop
 from src.agent.providers.openai import OpenAIProvider
+from src.agent.providers.deepseek import DeepSeekProvider
 from src.agent.tools import ToolRegistry, ReadFileTool, ListDirectoryTool, ShellTool
 
 # 设置控制台编码
 sys.stdout.reconfigure(encoding='utf-8')
 
 
+def get_provider():
+    """获取可用的 LLM Provider"""
+    # 优先使用 DeepSeek
+    deepseek_key = os.environ.get("DEEPSEEK_API_KEY")
+    if deepseek_key:
+        return DeepSeekProvider(api_key=deepseek_key)
+
+    # 其次使用 OpenAI
+    openai_key = os.environ.get("OPENAI_API_KEY")
+    if openai_key:
+        return OpenAIProvider(api_key=openai_key)
+
+    return None
+
+
 @pytest.mark.asyncio
 async def test_basic_agent():
     """测试基本 Agent 功能"""
-    # 检查 API Key
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        pytest.skip("OPENAI_API_KEY 未设置")
-
-    # 创建 Provider
-    provider = OpenAIProvider(api_key=api_key, model="gpt-3.5-turbo")
+    provider = get_provider()
+    if not provider:
+        pytest.skip("未设置任何 API Key (DEEPSEEK_API_KEY 或 OPENAI_API_KEY)")
 
     # 创建 Agent
     agent = AgentLoop(
@@ -29,7 +41,7 @@ async def test_basic_agent():
     )
 
     # 测试简单对话
-    response = await agent.run("What is 2+2?")
+    response = await agent.run("What is 2+2? Reply with just the number.")
     print(f"问题: What is 2+2?")
     print(f"回答: {response}")
 
@@ -41,12 +53,9 @@ async def test_basic_agent():
 @pytest.mark.asyncio
 async def test_agent_with_tools():
     """测试带工具的 Agent"""
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        pytest.skip("OPENAI_API_KEY 未设置")
-
-    # 创建 Provider
-    provider = OpenAIProvider(api_key=api_key, model="gpt-3.5-turbo")
+    provider = get_provider()
+    if not provider:
+        pytest.skip("未设置任何 API Key (DEEPSEEK_API_KEY 或 OPENAI_API_KEY)")
 
     # 创建工具
     tools = ToolRegistry()
