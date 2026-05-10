@@ -9,8 +9,9 @@
 3. [CLI 功能测试](#3-cli-功能测试)
 4. [Agent Loop 测试](#4-agent-loop-测试)
 5. [工具系统测试](#5-工具系统测试)
-6. [集成测试](#6-集成测试)
-7. [故障排查](#7-故障排查)
+6. [Skills 系统测试](#6-skills-系统测试)
+7. [集成测试](#7-集成测试)
+8. [故障排查](#8-故障排查)
 
 ---
 
@@ -32,9 +33,6 @@ venv\Scripts\activate
 source venv/bin/activate
 
 # 安装项目依赖
-pip install click rich openai pytest pytest-asyncio anthropic
-
-# 或者以开发模式安装
 pip install -e .
 ```
 
@@ -43,16 +41,16 @@ pip install -e .
 根据使用的 LLM Provider 设置对应的 API Key：
 
 ```bash
-# OpenAI
+# DeepSeek (推荐)
 # Windows PowerShell:
-$env:OPENAI_API_KEY="your-api-key-here"
+$env:DEEPSEEK_API_KEY="your-deepseek-key"
 # Windows CMD:
-set OPENAI_API_KEY=your-api-key-here
+set DEEPSEEK_API_KEY=your-deepseek-key
 # Linux/Mac:
-export OPENAI_API_KEY="your-api-key-here"
-
-# DeepSeek
 export DEEPSEEK_API_KEY="your-deepseek-key"
+
+# OpenAI
+export OPENAI_API_KEY="your-openai-key"
 
 # Anthropic
 export ANTHROPIC_API_KEY="your-anthropic-key"
@@ -119,19 +117,6 @@ python -m pytest tests/test_agent.py::TestConversation::test_add_messages
 python -m pytest -k "conversation"
 ```
 
-### 2.3 查看测试覆盖率
-
-```bash
-# 安装覆盖率工具
-pip install pytest-cov
-
-# 运行测试并生成覆盖率报告
-python -m pytest --cov=src --cov-report=term-missing
-
-# 生成 HTML 覆盖率报告
-python -m pytest --cov=src --cov-report=html
-```
-
 ---
 
 ## 3. CLI 功能测试
@@ -139,7 +124,6 @@ python -m pytest --cov=src --cov-report=html
 ### 3.1 查看帮助信息
 
 ```bash
-# 查看主帮助
 python -m src.agent.main --help
 ```
 
@@ -149,8 +133,6 @@ Usage: python -m src.agent.main [OPTIONS] COMMAND [ARGS]...
 
   My Agent - AI Agent with Agent Loop
 
-  A CLI tool for interacting with AI models using Agent Loop.
-
 Options:
   --version  Show the version and exit.
   --help     Show this message and exit.
@@ -159,6 +141,8 @@ Commands:
   ask        Execute a single query
   chat       Start interactive chat mode
   providers  List available LLM providers
+  run-skill  Run a skill with the given task
+  skills     List available skills
   version    Show version information
 ```
 
@@ -170,7 +154,7 @@ python -m src.agent.main version
 
 **预期输出**：
 ```
-My Agent v0.1.0
+My Agent v0.3.0
 ```
 
 ### 3.3 查看可用 Provider
@@ -188,8 +172,8 @@ Available LLM Providers:
     [X] API Key not set
 
   deepseek - DeepSeek
-    Default model: deepseek-chat
-    [X] API Key not set
+    Default model: deepseek-v4-flash
+    [OK] API Key set
 
   anthropic - Anthropic
     Default model: claude-sonnet-4-20250514
@@ -200,53 +184,24 @@ Available LLM Providers:
     No API key required
 ```
 
-### 3.4 查看子命令帮助
+### 3.4 测试单次查询（需要 API Key）
 
 ```bash
-# 查看 chat 命令帮助
-python -m src.agent.main chat --help
-```
-
-**预期输出**：
-```
-Usage: python -m src.agent.main chat [OPTIONS]
-
-  Start interactive chat mode
-
-Options:
-  -p, --provider TEXT  LLM provider (openai, deepseek, anthropic, ollama)
-  -m, --model TEXT     Model to use (uses provider default if not specified)
-  -t, --enable-tools   Enable tool calling
-  --help               Show this message and exit.
-```
-
-### 3.5 测试单次查询（需要 API Key）
-
-```bash
-# 使用 OpenAI
-python -m src.agent.main ask "What is Python?" --provider openai
-
 # 使用 DeepSeek
 python -m src.agent.main ask "What is Python?" --provider deepseek
 
-# 使用 Anthropic
-python -m src.agent.main ask "What is Python?" --provider anthropic
-
-# 使用 Ollama 本地模型
-python -m src.agent.main ask "What is Python?" --provider ollama
-
-# 启用工具
-python -m src.agent.main ask "List files in current directory" --provider openai --enable-tools
+# 使用流式输出
+python -m src.agent.main ask "What is Python?" --provider deepseek --stream
 ```
 
-### 3.6 测试交互式聊天（需要 API Key）
+### 3.5 测试交互式聊天（需要 API Key）
 
 ```bash
 # 启动交互式聊天
 python -m src.agent.main chat --provider deepseek
 
-# 启用工具的聊天
-python -m src.agent.main chat --provider openai --enable-tools
+# 启用工具和流式输出
+python -m src.agent.main chat --provider deepseek --enable-tools --stream
 ```
 
 ---
@@ -256,7 +211,6 @@ python -m src.agent.main chat --provider openai --enable-tools
 ### 4.1 测试 Conversation 类
 
 ```bash
-# 运行测试
 python -m pytest tests/test_conversation.py -v
 ```
 
@@ -269,7 +223,6 @@ tests/test_conversation.py::test_clear_conversation PASSED
 ### 4.2 测试 ToolRegistry 类
 
 ```bash
-# 运行测试
 python -m pytest tests/test_registry.py -v
 ```
 
@@ -286,7 +239,6 @@ tests/test_registry.py::test_get_definitions PASSED
 ### 5.1 测试文件操作工具
 
 ```bash
-# 运行测试
 python -m pytest tests/test_file_tools.py -v
 ```
 
@@ -300,7 +252,6 @@ tests/test_file_tools.py::test_read_nonexistent PASSED
 ### 5.2 测试 Shell 工具
 
 ```bash
-# 运行测试
 python -m pytest tests/test_shell_tool.py -v
 ```
 
@@ -313,12 +264,136 @@ tests/test_shell_tool.py::test_timeout PASSED
 
 ---
 
-## 6. 集成测试
+## 6. Skills 系统测试
 
-### 6.1 测试完整 Agent Loop（需要 API Key）
+### 6.1 Skills 系统逻辑
+
+```
+用户输入 Skill 名称和任务
+        ↓
+SkillLoader 加载 YAML 配置
+        ↓
+获取 Skill 的 prompt 模板
+        ↓
+拼接 prompt + 用户任务
+        ↓
+创建 Agent（自动启用需要的工具）
+        ↓
+调用 LLM 执行任务
+        ↓
+返回结果
+```
+
+### 6.2 列出可用 Skills
 
 ```bash
-# 运行 Agent Loop 测试
+python -m src.agent.main skills
+```
+
+**预期输出**：
+```
+Available Skills:
+
+CODING
+  explain_code - Explain what a piece of code does
+    Example: explain_code src/main.py
+  review_code - Review code for potential issues and improvements
+    Example: review_code src/main.py
+  refactor_code - Suggest refactoring improvements for code
+    Example: refactor_code src/utils.py
+  write_tests - Write unit tests for code
+    Example: write_tests src/calculator.py
+  fix_bug - Help fix a bug in code
+    Example: fix_bug the TypeError in main.py
+
+FILE
+  read_summary - Read and summarize a file
+    Example: read_summary README.md
+  find_files - Find files matching a pattern
+    Example: find_files all Python files
+  create_file - Create a new file with specified content
+    Example: create_file a new Python script
+  compare_files - Compare two files and show differences
+    Example: compare_files old.py and new.py
+
+GENERAL
+  explain - Explain a concept or topic
+    Example: explain how HTTP works
+  brainstorm - Brainstorm ideas on a topic
+    Example: brainstorm features for a todo app
+  summarize - Summarize text or content
+    Example: summarize this article
+  translate - Translate text between languages
+    Example: translate to Chinese: Hello World
+  format_text - Format text according to specified style
+    Example: format_text as markdown
+```
+
+### 6.3 测试通用 Skills（不需要工具）
+
+```bash
+# 测试 explain skill
+python -m src.agent.main run-skill explain "什么是递归" --provider deepseek
+
+# 测试 translate skill
+python -m src.agent.main run-skill translate "Hello World to Chinese" --provider deepseek
+
+# 测试 brainstorm skill
+python -m src.agent.main run-skill brainstorm "features for a todo app" --provider deepseek
+```
+
+### 6.4 测试文件 Skills（需要工具）
+
+```bash
+# 测试 read_summary skill
+python -m src.agent.main run-skill read_summary "README.md" --provider deepseek
+
+# 测试 find_files skill
+python -m src.agent.main run-skill find_files "all Python files" --provider deepseek
+```
+
+### 6.5 测试编程 Skills（需要工具）
+
+```bash
+# 测试 explain_code skill
+python -m src.agent.main run-skill explain_code "src/main.py" --provider deepseek
+
+# 测试 review_code skill
+python -m src.agent.main run-skill review_code "src/agent_loop.py" --provider deepseek
+```
+
+### 6.6 测试流式输出
+
+```bash
+python -m src.agent.main run-skill explain "什么是机器学习" --provider deepseek --stream
+```
+
+### 6.7 添加自定义 Skills
+
+在 `src/agent/skills/builtin/` 目录创建 YAML 文件：
+
+```yaml
+# my_skills.yml
+skills:
+  - name: my_custom_skill
+    description: "My custom skill"
+    category: custom
+    prompt: "Please do the following task:"
+    tools:
+      - read_file
+    examples:
+      - "my_custom_skill some task"
+```
+
+重新运行 `agent skills` 即可看到新 Skill。
+
+---
+
+## 7. 集成测试
+
+### 7.1 测试完整 Agent Loop（需要 API Key）
+
+```bash
 python -m pytest tests/test_agent_loop.py -v
 ```
 
@@ -334,24 +409,24 @@ tests/test_agent_loop.py::test_basic_agent SKIPPED
 tests/test_agent_loop.py::test_agent_with_tools SKIPPED
 ```
 
-### 6.2 测试 CLI 集成（需要 API Key）
+### 7.2 测试 CLI 集成（需要 API Key）
 
 ```bash
 # 测试单次查询
 python -m src.agent.main ask "What is Python?" --provider deepseek
 
 # 测试带工具的查询
-python -m src.agent.main ask "List files in current directory" --provider openai --enable-tools
+python -m src.agent.main ask "List files in current directory" --provider deepseek --enable-tools
 
-# 测试交互式聊天
-python -m src.agent.main chat --provider deepseek --enable-tools
+# 测试 Skills
+python -m src.agent.main run-skill explain "什么是递归" --provider deepseek --stream
 ```
 
 ---
 
-## 7. 故障排查
+## 8. 故障排查
 
-### 7.1 常见问题
+### 8.1 常见问题
 
 #### 问题：ModuleNotFoundError
 
@@ -378,9 +453,18 @@ Error: OPENAI_API_KEY environment variable not set
 **解决方案**：
 ```bash
 # 设置对应的环境变量
-export OPENAI_API_KEY="your-api-key"
-export DEEPSEEK_API_KEY="your-deepseek-key"
-export ANTHROPIC_API_KEY="your-anthropic-key"
+export DEEPSEEK_API_KEY="your-api-key"
+```
+
+#### 问题：PyYAML 未安装
+
+```
+ModuleNotFoundError: No module named 'yaml'
+```
+
+**解决方案**：
+```bash
+pip install pyyaml
 ```
 
 #### 问题：pytest 找不到测试
@@ -396,47 +480,6 @@ no tests ran in 0.00s
 # 确保在项目根目录运行
 python -m pytest tests/
 ```
-
-#### 问题：异步测试未执行
-
-```
-PytestUnhandledCoroutineWarning
-```
-
-**解决方案**：
-```bash
-# 确保安装了 pytest-asyncio
-pip install pytest-asyncio
-```
-
----
-
-## 8. 测试检查清单
-
-### 8.1 基础功能
-
-- [ ] 单元测试全部通过 (14 passed, 2 skipped)
-- [ ] CLI 帮助信息正常显示
-- [ ] 版本命令正常工作
-- [ ] providers 命令显示所有 Provider
-- [ ] 文件读写工具正常
-- [ ] 目录列出工具正常
-- [ ] Shell 工具正常
-
-### 8.2 Agent 功能（需要 API Key）
-
-- [ ] 基本对话正常
-- [ ] 工具调用正常
-- [ ] 多轮对话正常
-- [ ] 错误处理正常
-- [ ] 多 Provider 切换正常
-
-### 8.3 Git 相关
-
-- [x] Git 仓库已初始化
-- [x] 有多次有意义的提交
-- [x] 提交信息使用英文
-- [x] .gitignore 配置正确
 
 ---
 
@@ -465,21 +508,28 @@ python -m pytest tests/ -v
 python -m src.agent.main version
 python -m src.agent.main providers
 
-# 3. 测试文件工具
+# 3. 测试 Skills
+python -m src.agent.main skills
+python -m src.agent.main run-skill explain "什么是递归" --provider deepseek
+
+# 4. 测试文件工具
 python -m pytest tests/test_file_tools.py -v
 
-# 4. 测试 Shell 工具
+# 5. 测试 Shell 工具
 python -m pytest tests/test_shell_tool.py -v
 
-# 5. 测试完整 Agent（需要 API Key）
+# 6. 测试完整 Agent（需要 API Key）
 python -m pytest tests/test_agent_loop.py -v
 
-# 6. 测试聊天功能（需要 API Key）
-python -m src.agent.main ask "Hello" --provider deepseek
+# 7. 测试聊天功能（需要 API Key）
+python -m src.agent.main ask "Hello" --provider deepseek --stream
+
+# 8. 测试 Skills 功能（需要 API Key）
+python -m src.agent.main run-skill explain "什么是递归" --provider deepseek --stream
 ```
 
 ---
 
 *文档创建时间：2026-05-10*
 *最后更新：2026-05-10*
-*项目版本：v0.1.0*
+*项目版本：v0.3.0*
