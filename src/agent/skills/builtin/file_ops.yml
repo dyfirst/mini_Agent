@@ -1,0 +1,42 @@
+skills:
+  - name: read_summary
+    description: Read and summarize a file
+    category: file
+    prompt: "Please read the following file and provide a concise summary of its contents:"
+    tools:
+      - read_file
+    examples:
+      - "read_summary README.md"
+      - "read_summary the config file"
+
+  - name: find_files
+    description: Find files matching a pattern
+    category: file
+    prompt: "Please find files matching the following pattern and list them:"
+    tools:
+      - list_directory
+      - shell
+    examples:
+      - "find_files all Python files"
+      - "find_files files containing 'TODO'"
+
+  - name: create_file
+    description: Create a new file with specified content
+    category: file
+    prompt: "Please create a new file with the following specifications:"
+    tools:
+      - write_file
+    examples:
+      - "create_file a new Python script"
+      - "create_file a configuration file"
+
+  - name: compare_files
+    description: Compare two files and show differences
+    category: file
+    prompt: "Please compare the following two files and show the differences:"
+    tools:
+      - read_file
+      - shell
+    examples:
+      - "compare_files old.py and new.py"
+      - "compare_files config.dev.yml and config.prod.yml"

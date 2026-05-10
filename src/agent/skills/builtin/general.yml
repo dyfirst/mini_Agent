@@ -1,0 +1,42 @@
+skills:
+  - name: explain
+    description: Explain a concept or topic
+    category: general
+    prompt: "Please explain the following in a clear and concise way:"
+    examples:
+      - "explain how HTTP works"
+      - "explain what is recursion"
+
+  - name: brainstorm
+    description: Brainstorm ideas on a topic
+    category: general
+    prompt: "Please brainstorm ideas on the following topic. Provide multiple creative suggestions:"
+    examples:
+      - "brainstorm features for a todo app"
+      - "brainstorm ways to improve performance"
+
+  - name: summarize
+    description: Summarize text or content
+    category: general
+    prompt: "Please provide a concise summary of the following:"
+    tools:
+      - read_file
+    examples:
+      - "summarize this article"
+      - "summarize the README file"
+
+  - name: translate
+    description: Translate text between languages
+    category: general
+    prompt: "Please translate the following text:"
+    examples:
+      - "translate to Chinese: Hello World"
+      - "translate to English: 你好世界"
+
+  - name: format_text
+    description: Format text according to specified style
+    category: general
+    prompt: "Please format the following text according to the specified style:"
+    examples:
+      - "format_text as markdown"
+      - "format_text as JSON"

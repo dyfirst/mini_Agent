@@ -1,0 +1,54 @@
+skills:
+  - name: explain_code
+    description: Explain what a piece of code does
+    category: coding
+    prompt: "Please explain what the following code does in detail. Break down the logic and explain each important part:"
+    tools:
+      - read_file
+    examples:
+      - "explain_code src/main.py"
+      - "explain_code the function in utils.py"
+
+  - name: review_code
+    description: Review code for potential issues and improvements
+    category: coding
+    prompt: "Please review the following code for potential issues, bugs, and improvements. Consider: code quality, performance, security, and best practices:"
+    tools:
+      - read_file
+    examples:
+      - "review_code src/main.py"
+      - "review_code the authentication module"
+
+  - name: refactor_code
+    description: Suggest refactoring improvements for code
+    category: coding
+    prompt: "Please suggest refactoring improvements for the following code. Focus on: readability, maintainability, and following best practices:"
+    tools:
+      - read_file
+      - write_file
+    examples:
+      - "refactor_code src/utils.py"
+      - "refactor_code the database module"
+
+  - name: write_tests
+    description: Write unit tests for code
+    category: coding
+    prompt: "Please write comprehensive unit tests for the following code. Include: happy path tests, edge cases, and error handling tests:"
+    tools:
+      - read_file
+      - write_file
+    examples:
+      - "write_tests src/calculator.py"
+      - "write_tests the User class"
+
+  - name: fix_bug
+    description: Help fix a bug in code
+    category: coding
+    prompt: "Please help me fix the following bug. Analyze the issue, identify the root cause, and provide a fix:"
+    tools:
+      - read_file
+      - write_file
+      - shell
+    examples:
+      - "fix_bug the TypeError in main.py"
+      - "fix_bug the login failure"

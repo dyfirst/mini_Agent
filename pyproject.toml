@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "my-agent"
-version = "0.2.0"
+version = "0.3.0"
 description = "Custom AI Agent with Agent Loop"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -17,6 +17,7 @@ dependencies = [
     "rich>=13.0",
     "prompt_toolkit>=3.0",
     "openai>=1.0",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]

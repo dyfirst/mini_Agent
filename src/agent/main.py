@@ -20,8 +20,12 @@ from .providers.anthropic import AnthropicProvider
 from .providers.ollama import OllamaProvider
 from .providers.base import LLMProvider
 from .tools import ToolRegistry, ReadFileTool, WriteFileTool, ListDirectoryTool, ShellTool
+from .skills import SkillLoader
 
 console = Console()
+
+# Initialize skill loader
+skill_loader = SkillLoader()
 
 # Provider configuration
 PROVIDER_CONFIG = {
@@ -138,7 +142,7 @@ When using tools, explain what you're doing and why."""
 
 
 @click.group()
-@click.version_option(version="0.2.0")
+@click.version_option(version="0.3.0")
 def cli():
     """My Agent - AI Agent with Agent Loop
 
@@ -266,9 +270,78 @@ def providers():
 
 
 @cli.command()
+def skills():
+    """List available skills"""
+    console.print("[bold]Available Skills:[/bold]\n")
+
+    categories = skill_loader.get_categories()
+
+    for category in sorted(categories):
+        console.print(f"[bold cyan]{category.upper()}[/bold cyan]")
+
+        category_skills = skill_loader.list_skills(category=category)
+        for skill in category_skills:
+            console.print(f"  [bold]{skill.name}[/bold] - {skill.description}")
+            if skill.examples:
+                console.print(f"    [dim]Example: {skill.examples[0]}[/dim]")
+
+        console.print()
+
+
+@cli.command()
+@click.argument("skill_name")
+@click.argument("task")
+@click.option("--provider", "-p", default="openai", help="LLM provider")
+@click.option("--model", "-m", default=None, help="Model to use")
+@click.option("--stream", "-s", is_flag=True, help="Enable streaming output")
+def run_skill(skill_name: str, task: str, provider: str, model: str, stream: bool):
+    """Run a skill with the given task"""
+    skill = skill_loader.get_skill(skill_name)
+
+    if not skill:
+        console.print(f"[red]Error: Skill '{skill_name}' not found[/red]")
+        console.print("[dim]Use 'agent skills' to list available skills[/dim]")
+        raise click.Abort()
+
+    # Build the full prompt
+    full_prompt = f"{skill.prompt}\n\n{task}"
+
+    console.print(f"[bold blue]Skill:[/bold blue] {skill.name}")
+    console.print(f"[bold blue]Task:[/bold blue] {task}")
+    console.print(f"[dim]Provider: {provider} | Stream: {'on' if stream else 'off'}[/dim]\n")
+
+    # Create agent with tools if skill requires them
+    enable_tools = skill.tools is not None and len(skill.tools) > 0
+
+    try:
+        agent = create_agent(provider, model, enable_tools)
+    except click.Abort:
+        return
+
+    # Run agent
+    try:
+        console.print("[bold green]Response:[/bold green] ", end="")
+
+        if stream:
+            async def stream_response():
+                async for chunk in agent.run_stream(full_prompt):
+                    if isinstance(chunk, dict):
+                        continue
+                    console.print(chunk, end="", highlight=False)
+                console.print()
+
+            asyncio.run(stream_response())
+        else:
+            response = asyncio.run(agent.run(full_prompt))
+            console.print(Markdown(response))
+    except Exception as e:
+        console.print(f"[red]Error: {str(e)}[/red]")
+
+
+@cli.command()
 def version():
     """Show version information"""
-    console.print("[bold]My Agent[/bold] v0.2.0")
+    console.print("[bold]My Agent[/bold] v0.3.0")
 
 
 if __name__ == "__main__":
