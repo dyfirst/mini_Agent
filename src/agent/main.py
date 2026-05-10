@@ -23,6 +23,7 @@ from .providers.base import LLMProvider
 from .tools import ToolRegistry, ReadFileTool, WriteFileTool, ListDirectoryTool, ShellTool
 from .skills import SkillLoader
 from .mcp import MCPClient, MCPToolAdapter
+from .vibe import VibeEditor, ProjectScanner
 
 console = Console()
 
@@ -229,7 +230,7 @@ When using tools, explain what you're doing and why."""
 
 
 @click.group()
-@click.version_option(version="0.4.0")
+@click.version_option(version="0.5.0")
 def cli():
     """My Agent - AI Agent with Agent Loop
 
@@ -470,9 +471,117 @@ def mcp_servers():
 
 
 @cli.command()
+@click.option("--provider", "-p", default="deepseek", help="LLM provider")
+@click.option("--model", "-m", default=None, help="Model to use")
+@click.option("--dir", "-d", default=".", help="Project directory")
+@click.option("--task", "-t", default=None, help="Initial task description")
+@click.option("--auto-apply", is_flag=True, help="Auto-apply changes without confirmation")
+def vibe(provider: str, model: str, dir: str, task: str, auto_apply: bool):
+    """Start Vibe Coding mode - Interactive code editing with AI"""
+    console.print(
+        Panel(
+            "[bold green]Vibe Coding Mode[/bold green]\n"
+            "[dim]Describe your coding task and I'll help you implement it[/dim]",
+            title="Vibe Coding",
+        )
+    )
+
+    # Scan project
+    scanner = ProjectScanner(dir)
+    scan_result = scanner.scan()
+
+    console.print(f"\n[bold]Project:[/bold] {scan_result['root']}")
+    console.print(f"[bold]Files:[/bold] {scan_result['file_count']}")
+    console.print(f"[bold]Lines:[/bold] {scan_result['total_lines']}")
+
+    if scan_result['languages']:
+        console.print("[bold]Languages:[/bold]")
+        for ext, count in sorted(scan_result['languages'].items(), key=lambda x: -x[1])[:5]:
+            console.print(f"  {ext}: {count} files")
+
+    # Create editor
+    try:
+        provider_instance = create_provider(provider, model)
+    except click.Abort:
+        return
+
+    editor = VibeEditor(provider_instance, dir)
+
+    # Initial task
+    if task:
+        console.print(f"\n[bold blue]Task:[/bold blue] {task}")
+        response = asyncio.run(editor.edit(task))
+        console.print("\n[bold green]Suggested Changes:[/bold green]")
+        console.print(Markdown(response))
+
+        # Parse and show changes
+        blocks = editor.parse_code_blocks(response)
+        if blocks:
+            console.print("\n[bold]Files to modify:[/bold]")
+            for block in blocks:
+                console.print(f"  - {block['filepath']}")
+
+            if auto_apply:
+                console.print("\n[yellow]Auto-applying changes...[/yellow]")
+                for block in blocks:
+                    success = scanner.write_file(block['filepath'], block['content'])
+                    if success:
+                        console.print(f"[green]✓ Applied: {block['filepath']}[/green]")
+                    else:
+                        console.print(f"[red]✗ Failed: {block['filepath']}[/red]")
+            else:
+                console.print("\n[dim]Use --auto-apply to automatically apply changes[/dim]")
+
+    # Interactive loop
+    console.print("\n[dim]Type your task or 'exit' to quit[/dim]\n")
+
+    while True:
+        try:
+            user_input = console.input("[bold blue]Vibe:[/bold blue] ")
+
+            if user_input.lower() in ("exit", "quit", "q"):
+                console.print("\n[yellow]Goodbye![/yellow]")
+                break
+
+            if not user_input.strip():
+                continue
+
+            # Get relevant files
+            relevant_files = scanner.get_relevant_files(user_input)
+            if relevant_files:
+                console.print(f"[dim]Relevant files: {', '.join(relevant_files[:3])}[/dim]")
+
+            # Edit
+            response = asyncio.run(editor.edit(user_input, relevant_files))
+            console.print("\n[bold green]Suggested Changes:[/bold green]")
+            console.print(Markdown(response))
+
+            # Parse and show changes
+            blocks = editor.parse_code_blocks(response)
+            if blocks:
+                console.print("\n[bold]Files to modify:[/bold]")
+                for block in blocks:
+                    console.print(f"  - {block['filepath']}")
+
+                if auto_apply:
+                    console.print("\n[yellow]Auto-applying changes...[/yellow]")
+                    for block in blocks:
+                        success = scanner.write_file(block['filepath'], block['content'])
+                        if success:
+                            console.print(f"[green]✓ Applied: {block['filepath']}[/green]")
+                        else:
+                            console.print(f"[red]✗ Failed: {block['filepath']}[/red]")
+
+        except KeyboardInterrupt:
+            console.print("\n\n[yellow]Interrupted. Type 'exit' to quit.[/yellow]")
+        except Exception as e:
+            console.print(f"\n[red]Error: {str(e)}[/red]")
+
+
+@cli.command()
 def version():
     """Show version information"""
-    console.print("[bold]My Agent[/bold] v0.4.0")
+    console.print("[bold]My Agent[/bold] v0.5.0")
 
 
 if __name__ == "__main__":
