@@ -389,6 +389,59 @@ skills:
 
 ---
 
+## 6.8 Vibe Coding 测试
+
+### Vibe Coding 工作原理
+
+```
+用户描述任务
+    ↓
+扫描项目结构
+    ↓
+收集相关文件作为上下文
+    ↓
+AI 生成代码修改
+    ↓
+应用到文件
+```
+
+### 测试案例 1：创建包含当前时间的文件
+
+```bash
+# 使用 Vibe Coding 创建文件
+python -m src.agent.main vibe --task "创建一个名为 datetime.txt 的文件，内容是当前日期和时间" --provider deepseek --auto-apply
+
+# 验证文件
+type datetime.txt
+```
+
+**预期行为**：
+1. 扫描项目结构
+2. AI 生成创建文件的代码
+3. 自动创建 `datetime.txt` 文件
+4. 文件内容包含当前日期和时间
+
+### 测试案例 2：交互式编辑
+
+```bash
+# 启动 Vibe Coding 模式
+python -m src.agent.main vibe --provider deepseek
+
+# 输入任务
+Vibe: 创建一个 hello.py 文件，打印 "Hello, World!"
+Vibe: 修改 hello.py，添加当前时间显示
+Vibe: exit
+```
+
+### 测试案例 3：指定目录
+
+```bash
+# 对指定目录进行操作
+python -m src.agent.main vibe --dir ./my-project --task "列出所有 Python 文件" --provider deepseek
+```
+
+---
+
 ## 7. 集成测试
 
 ### 7.1 测试完整 Agent Loop（需要 API Key）
