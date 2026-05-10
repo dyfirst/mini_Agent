@@ -9,15 +9,18 @@ My Agent 是一个自定义的 AI Agent 实现，类似于 Claude Code。它提�
 - **CLI 交互界面**：支持交互式聊天和单次查询模式
 - **Agent Loop**：核心逻辑，处理用户输入、LLM 响应和工具调用
 - **工具系统**：可扩展的工具架构，支持文件操作和命令行执行
-- **Provider 系统**：支持多种 LLM 服务商（当前实现 OpenAI）
+- **多 Provider 支持**：支持 OpenAI、DeepSeek、Anthropic、Ollama 等多种 LLM 服务商
 
 ### 1.2 技术栈
 
 - **Python 3.9+**
 - **Click**：CLI 框架
 - **Rich**：终端 UI 美化
-- **OpenAI API**：LLM 服务
+- **OpenAI SDK**：LLM 服务（兼容 DeepSeek、Ollama）
+- **Anthropic SDK**：Claude 服务
 - **Pytest**：测试框架
+
+---
 
 ## 2. 架构设计
 
@@ -30,7 +33,7 @@ CLI (main.py)
     ↓
 Agent Loop
     ↓
-LLM Provider
+LLM Provider (OpenAI/DeepSeek/Anthropic/Ollama)
     ↓
 工具调用? → 是 → 执行工具 → 返回结果 → 继续循环
     ↓ 否
@@ -72,8 +75,13 @@ Agent Loop 是系统的核心，负责：
 #### 2.2.3 Providers (`providers/`)
 
 LLM Provider 抽象层：
-- `LLMProvider`：抽象基类
-- `OpenAIProvider`：OpenAI API 实现
+
+| Provider | 文件 | 环境变量 | 默认模型 |
+|----------|------|----------|----------|
+| OpenAI | `openai.py` | `OPENAI_API_KEY` | gpt-4 |
+| DeepSeek | `deepseek.py` | `DEEPSEEK_API_KEY` | deepseek-v4-flash |
+| Anthropic | `anthropic.py` | `ANTHROPIC_API_KEY` | claude-sonnet-4-20250514 |
+| Ollama | `ollama.py` | 无 | llama3 |
 
 **接口定义**：
 ```python
@@ -122,6 +130,8 @@ class LLMProvider(ABC):
 12. 返回响应给用户
 ```
 
+---
+
 ## 3. 模块详细设计
 
 ### 3.1 CLI 模块
@@ -131,9 +141,11 @@ class LLMProvider(ABC):
 **命令**：
 - `agent chat`：交互式聊天
 - `agent ask "prompt"`：单次查询
+- `agent providers`：列出可用 Provider
 - `agent version`：显示版本
 
 **选项**：
+- `--provider, -p`：指定 LLM Provider (openai, deepseek, anthropic, ollama)
 - `--model, -m`：指定模型
 - `--enable-tools, -t`：启用工具调用
 
@@ -212,9 +224,152 @@ class LLMResponse:
     tool_calls: Optional[List[ToolCall]] = None
 ```
 
-## 4. 扩展指南
+**ToolCall 结构**：
+```python
+@dataclass
+class ToolCall:
+    id: str
+    name: str
+    arguments: Dict[str, Any]
+```
 
-### 4.1 添加新工具
+---
+
+## 4. API 文档
+
+### 4.1 CLI API
+
+```bash
+# 查看帮助
+agent --help
+
+# 列出可用 Provider
+agent providers
+
+# 交互式聊天
+agent chat [OPTIONS]
+  -p, --provider TEXT  LLM provider (openai, deepseek, anthropic, ollama)
+  -m, --model TEXT     Model to use
+  -t, --enable-tools   Enable tool calling
+
+# 单次查询
+agent ask PROMPT [OPTIONS]
+  -p, --provider TEXT  LLM provider
+  -m, --model TEXT     Model to use
+  -t, --enable-tools   Enable tool calling
+
+# 显示版本
+agent version
+```
+
+### 4.2 Python API
+
+#### AgentLoop
+
+```python
+from src.agent.agent_loop import AgentLoop
+from src.agent.providers.deepseek import DeepSeekProvider
+from src.agent.tools import ToolRegistry, ReadFileTool
+
+# 创建 Provider
+provider = DeepSeekProvider(api_key="your-key")
+
+# 创建工具注册表
+tools = ToolRegistry()
+tools.register("read_file", ReadFileTool())
+
+# 创建 Agent
+agent = AgentLoop(
+    provider=provider,
+    tools=tools,
+    system_prompt="You are a helpful assistant.",
+    max_iterations=10,
+)
+
+# 运行
+response = await agent.run("Hello")
+```
+
+#### Conversation
+
+```python
+from src.agent.conversation import Conversation
+
+conv = Conversation(system_prompt="You are a helper")
+conv.add_user_message("Hello")
+conv.add_assistant_message("Hi!")
+conv.add_tool_result("tool_id", "result")
+
+messages = conv.get_messages_for_api()
+```
+
+#### ToolRegistry
+
+```python
+from src.agent.tools import ToolRegistry, ReadFileTool, ShellTool
+
+registry = ToolRegistry()
+registry.register("read_file", ReadFileTool())
+registry.register("shell", ShellTool())
+
+definitions = registry.get_tool_definitions()
+result = await registry.execute("read_file", {"path": "test.txt"})
+```
+
+---
+
+## 5. 使用示例
+
+### 5.1 基本使用
+
+```bash
+# 设置 API Key
+export DEEPSEEK_API_KEY="your-key"
+
+# 单次查询
+agent ask "What is Python?" --provider deepseek
+
+# 交互式聊天
+agent chat --provider deepseek
+
+# 带工具的聊天
+agent chat --provider deepseek --enable-tools
+```
+
+### 5.2 使用不同 Provider
+
+```bash
+# 使用 OpenAI
+agent ask "Hello" --provider openai --model gpt-3.5-turbo
+
+# 使用 DeepSeek
+agent ask "Hello" --provider deepseek --model deepseek-v4-flash
+
+# 使用 Anthropic
+agent ask "Hello" --provider anthropic
+
+# 使用 Ollama（本地）
+agent ask "Hello" --provider ollama --model llama3
+```
+
+### 5.3 工具调用示例
+
+```bash
+# 读取文件
+agent ask "读取 README.md 的内容" --provider deepseek --enable-tools
+
+# 列出目录
+agent ask "列出当前目录的文件" --provider deepseek --enable-tools
+
+# 执行命令
+agent ask "查看 Python 版本" --provider deepseek --enable-tools
+```
+
+---
+
+## 6. 扩展指南
+
+### 6.1 添加新工具
 
 1. 创建工具类，继承 `Tool`
 2. 实现 `get_definition()` 方法
@@ -222,6 +377,8 @@ class LLMResponse:
 4. 在 `ToolRegistry` 中注册
 
 ```python
+from src.agent.tools.base import Tool
+
 class MyTool(Tool):
     def get_definition(self):
         return {
@@ -229,194 +386,118 @@ class MyTool(Tool):
             "function": {
                 "name": "my_tool",
                 "description": "My custom tool",
-                "parameters": {...}
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "param1": {
+                            "type": "string",
+                            "description": "Parameter description"
+                        }
+                    },
+                    "required": ["param1"]
+                }
             }
         }
 
-    async def execute(self, **kwargs):
+    async def execute(self, param1: str, **kwargs) -> str:
         # 实现逻辑
-        return "result"
+        return f"Result: {param1}"
 ```
 
-### 4.2 添加新 Provider
+### 6.2 添加新 Provider
 
 1. 创建 Provider 类，继承 `LLMProvider`
 2. 实现 `chat()` 方法
 3. 可选：实现 `stream_chat()` 方法
+4. 在 `main.py` 的 `PROVIDER_CONFIG` 中注册
 
 ```python
+from src.agent.providers.base import LLMProvider, LLMResponse
+
 class MyProvider(LLMProvider):
+    def __init__(self, api_key: str, model: str = "default"):
+        self.api_key = api_key
+        self.model = model
+
     async def chat(self, messages, tools=None):
         # 调用 LLM API
         return LLMResponse(content="response")
 ```
 
-### 4.3 添加 MCP 支持
+---
 
-MCP (Model Context Protocol) 扩展：
-1. 实现 MCP 客户端
-2. 将 MCP 工具转换为 Tool 接口
-3. 在 ToolRegistry 中注册
+## 7. 测试策略
 
-### 4.4 添加 Skills 支持
-
-Skills 扩展：
-1. 定义 Skill 文件格式（YAML/JSON）
-2. 实现 Skill 加载器
-3. 将 Skill 转换为工具调用
-
-## 5. 测试策略
-
-### 5.1 单元测试
+### 7.1 单元测试
 
 - 测试 Conversation 类
 - 测试 ToolRegistry 类
 - 测试各个 Tool 实现
 - 测试 Provider 基类
 
-### 5.2 集成测试
+### 7.2 集成测试
 
 - 测试完整的 Agent Loop 流程
 - 测试工具链式调用
 - 测试错误处理
 
-### 5.3 测试命令
+### 7.3 测试命令
 
 ```bash
 # 运行所有测试
-pytest
+python -m pytest tests/ -v
 
 # 运行特定测试
-pytest tests/test_agent.py
+python -m pytest tests/test_agent.py -v
 
-# 运行带详细输出
-pytest -v
+# 运行 Agent Loop 测试（需要 API Key）
+python -m pytest tests/test_agent_loop.py -v
 ```
 
-## 6. 部署和使用
+---
 
-### 6.1 安装
-
-```bash
-# 克隆仓库
-git clone <repository-url>
-cd my-agent
-
-# 创建虚拟环境
-python -m venv venv
-source venv/bin/activate
-
-# 安装依赖
-pip install -e .
-```
-
-### 6.2 配置
-
-设置 OpenAI API Key：
-```bash
-export OPENAI_API_KEY="your-api-key"
-```
-
-### 6.3 使用
-
-```bash
-# 交互式聊天
-agent chat
-
-# 带工具的聊天
-agent chat --enable-tools
-
-# 单次查询
-agent ask "What is Python?"
-
-# 指定模型
-agent chat --model gpt-3.5-turbo
-```
-
-## 7. 性能考虑
-
-### 7.1 并发处理
-
-- 使用 `asyncio` 进行异步操作
-- 工具执行可以并发（如果无依赖）
-
-### 7.2 缓存
-
-- 可以添加 LLM 响应缓存
-- 可以添加工具结果缓存
-
-### 7.3 限制
-
-- 最大迭代次数限制（默认 10）
-- 工具执行超时（Shell 工具默认 30 秒）
-- 会话历史长度限制（可选）
-
-## 8. 安全考虑
-
-### 8.1 API Key 管理
-
-- 从环境变量读取 API Key
-- 不在代码中硬编码
-
-### 8.2 工具执行安全
-
-- Shell 工具执行命令时需谨慎
-- 文件操作工具应验证路径
-- 可以添加白名单/黑名单机制
-
-### 8.3 输入验证
-
-- 验证工具参数
-- 过滤敏感命令
-- 限制文件访问范围
-
-## 9. 未来改进
-
-### 9.1 功能增强
-
-- 支持更多 LLM Provider（Anthropic, Google）
-- 支持流式输出
-- 支持多模态输入（图片、文件）
-- 支持会话持久化
-
-### 9.2 工具增强
-
-- 添加更多内置工具（搜索、数据库操作）
-- 支持工具组合
-- 支持条件工具调用
-
-### 9.3 用户体验
-
-- 添加命令历史
-- 添加自动补全
-- 添加主题配置
-
-## 10. 附录
-
-### 10.1 项目结构
+## 8. 项目结构
 
 ```
 my-agent/
 ├── src/
 │   └── agent/
-│       ├── main.py           # CLI 入口
-│       ├── agent_loop.py     # Agent Loop 核心
-│       ├── conversation.py   # 会话管理
-│       ├── providers/        # LLM Provider
-│       │   ├── base.py
-│       │   └── openai.py
-│       └── tools/            # 工具系统
-│           ├── base.py
-│           ├── registry.py
-│           ├── file_ops.py
-│           └── shell.py
-├── tests/                    # 测试
-├── docs/                     # 文档
-├── pyproject.toml           # 项目配置
-└── README.md                # 项目说明
+│       ├── main.py              # CLI 入口
+│       ├── agent_loop.py        # Agent Loop 核心
+│       ├── conversation.py      # 会话管理
+│       ├── providers/           # LLM Provider
+│       │   ├── __init__.py
+│       │   ├── base.py          # Provider 基类
+│       │   ├── openai.py        # OpenAI Provider
+│       │   ├── deepseek.py      # DeepSeek Provider
+│       │   ├── anthropic.py     # Anthropic Provider
+│       │   └── ollama.py        # Ollama Provider
+│       └── tools/               # 工具系统
+│           ├── __init__.py
+│           ├── base.py          # Tool 基类
+│           ├── registry.py      # ToolRegistry
+│           ├── file_ops.py      # 文件操作工具
+│           └── shell.py         # Shell 工具
+├── tests/                       # 测试
+│   ├── test_agent.py
+│   ├── test_agent_loop.py
+│   ├── test_conversation.py
+│   ├── test_file_tools.py
+│   ├── test_registry.py
+│   └── test_shell_tool.py
+├── docs/                        # 文档
+│   └── design.md
+├── pyproject.toml               # 项目配置
+├── README.md                    # 项目说明
+├── TEST_GUIDE.md                # 测试指南
+└── CLAUDE.md                    # Claude Code 配置
 ```
 
-### 10.2 依赖列表
+---
+
+## 9. 依赖列表
+
+### 核心依赖
 
 - click >= 8.0
 - httpx >= 0.24.0
@@ -425,8 +506,22 @@ my-agent/
 - prompt_toolkit >= 3.0
 - openai >= 1.0
 
-### 10.3 参考资料
+### 可选依赖
+
+- anthropic >= 0.18.0（用于 Anthropic Provider）
+
+### 开发依赖
+
+- pytest >= 7.0
+- pytest-asyncio >= 0.21
+- pytest-cov（可选，用于覆盖率）
+
+---
+
+## 10. 参考资料
 
 - [OpenAI API 文档](https://platform.openai.com/docs)
+- [DeepSeek API 文档](https://platform.deepseek.com/docs)
+- [Anthropic API 文档](https://docs.anthropic.com/)
 - [Click 文档](https://click.palletsprojects.com/)
 - [Rich 文档](https://rich.readthedocs.io/)
