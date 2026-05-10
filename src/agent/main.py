@@ -34,7 +34,7 @@ PROVIDER_CONFIG = {
     "deepseek": {
         "name": "DeepSeek",
         "env_key": "DEEPSEEK_API_KEY",
-        "default_model": "deepseek-chat",
+        "default_model": "deepseek-v4-flash",
         "provider_class": DeepSeekProvider,
     },
     "anthropic": {

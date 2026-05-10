@@ -84,6 +84,8 @@ class AgentLoop:
         Args:
             response: LLM response containing tool calls
         """
+        import json
+
         # Add assistant message with tool calls
         tool_calls_data = [
             {
@@ -91,7 +93,7 @@ class AgentLoop:
                 "type": "function",
                 "function": {
                     "name": tc.name,
-                    "arguments": tc.arguments,
+                    "arguments": json.dumps(tc.arguments, ensure_ascii=False),
                 },
             }
             for tc in response.tool_calls
@@ -107,7 +109,7 @@ class AgentLoop:
 
             # Add tool result to conversation
             self.conversation.add_tool_result(
-                tool_call_id=tool_call_id,
+                tool_call_id=tool_call.id,
                 content=result,
             )
 
