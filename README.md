@@ -8,6 +8,7 @@ Custom AI Agent with Agent Loop implementation.
 - Agent Loop with tool calling support
 - Streaming output (typewriter effect)
 - Skills system (predefined task templates)
+- MCP (Model Context Protocol) support for external tool servers
 - Multiple LLM provider support (OpenAI, DeepSeek, Anthropic, Ollama)
 - File operations (read, write, list)
 - Shell command execution
@@ -69,6 +70,12 @@ agent skills
 # Run a skill
 agent run-skill explain "什么是递归" --provider deepseek --stream
 agent run-skill review_code "src/main.py" --provider deepseek
+
+# List MCP servers
+agent mcp-servers
+
+# Chat with MCP tools enabled
+agent chat --provider deepseek --enable-mcp
 ```
 
 ## Available Providers
@@ -144,6 +151,78 @@ skills:
       - "my_skill example task"
 ```
 
+## MCP (Model Context Protocol) Support
+
+### What is MCP?
+
+MCP is a protocol that allows AI models to connect to external tool servers. This enables access to tools like:
+- Filesystem operations
+- GitHub integration
+- Web search
+- Database access
+- And more...
+
+### How It Works
+
+```
+User Request
+    ↓
+Agent with MCP tools enabled
+    ↓
+MCP Client connects to servers
+    ↓
+Discover available tools
+    ↓
+Call tools as needed
+    ↓
+Return results to user
+```
+
+### Configuration
+
+Create `mcp_config.json` in project root:
+
+```json
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/dir"],
+      "env": {}
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "your-token"
+      }
+    }
+  }
+}
+```
+
+### Usage
+
+```bash
+# List configured MCP servers
+agent mcp-servers
+
+# Chat with MCP tools
+agent chat --provider deepseek --enable-mcp
+
+# Single query with MCP tools
+agent ask "List files in /path" --provider deepseek --enable-mcp
+```
+
+### Available MCP Servers
+
+| Server | Description |
+|--------|-------------|
+| `@modelcontextprotocol/server-filesystem` | File system operations |
+| `@modelcontextprotocol/server-github` | GitHub integration |
+| `@modelcontextprotocol/server-brave-search` | Web search |
+| `@modelcontextprotocol/server-memory` | Knowledge graph |
+
 ## Project Structure
 
 ```
@@ -163,12 +242,16 @@ my-agent/
 │   │   ├── registry.py    # Tool registry
 │   │   ├── file_ops.py    # File operations
 │   │   └── shell.py       # Shell commands
-│   └── skills/            # Skills system
-│       ├── loader.py      # Skill loader
-│       └── builtin/       # Built-in skills
-│           ├── coding.yml
-│           ├── file_ops.yml
-│           └── general.yml
+│   ├── skills/            # Skills system
+│   │   ├── loader.py      # Skill loader
+│   │   └── builtin/       # Built-in skills
+│   │       ├── coding.yml
+│   │       ├── file_ops.yml
+│   │       └── general.yml
+│   └── mcp/               # MCP support
+│       ├── client.py      # MCP client
+│       └── adapter.py     # MCP tool adapter
+├── mcp_config.example.json # MCP configuration example
 ├── tests/                 # Unit tests
 ├── docs/                  # Documentation
 ├── pyproject.toml         # Project configuration
