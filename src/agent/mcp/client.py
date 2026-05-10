@@ -52,13 +52,21 @@ class MCPServer:
         """Start the MCP server process"""
         try:
             cmd = [self.command] + self.args
+
+            # Merge environment variables
+            import os
+            merged_env = {**os.environ, **self.env}
+
             self.process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                env={**self.env},
+                env=merged_env,
             )
+
+            # Wait a bit for the server to start
+            await asyncio.sleep(2)
 
             # Initialize connection
             await self._send_request("initialize", {
@@ -66,9 +74,12 @@ class MCPServer:
                 "capabilities": {},
                 "clientInfo": {
                     "name": "my-agent",
-                    "version": "0.3.0",
+                    "version": "0.4.0",
                 },
             })
+
+            # Send initialized notification
+            await self._send_notification("initialized", {})
 
             # List available tools
             await self._refresh_tools()
@@ -126,6 +137,26 @@ class MCPServer:
             raise Exception(f"MCP error: {response['error']}")
 
         return response.get("result", {})
+
+    async def _send_notification(self, method: str, params: Dict[str, Any] = None):
+        """Send JSON-RPC notification (no response expected)
+
+        Args:
+            method: Method name
+            params: Method parameters
+        """
+        notification = {
+            "jsonrpc": "2.0",
+            "method": method,
+        }
+
+        if params:
+            notification["params"] = params
+
+        # Send notification
+        notification_str = json.dumps(notification) + "\n"
+        self.process.stdin.write(notification_str.encode())
+        await self.process.stdin.drain()
 
     async def _refresh_tools(self):
         """Refresh available tools from server"""
