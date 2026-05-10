@@ -1,3 +1,3 @@
 """My Agent - Custom AI Agent with Agent Loop"""
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"

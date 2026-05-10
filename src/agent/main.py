@@ -1,6 +1,7 @@
 """CLI entry point for My Agent"""
 
 import asyncio
+import json
 import os
 import sys
 
@@ -21,11 +22,15 @@ from .providers.ollama import OllamaProvider
 from .providers.base import LLMProvider
 from .tools import ToolRegistry, ReadFileTool, WriteFileTool, ListDirectoryTool, ShellTool
 from .skills import SkillLoader
+from .mcp import MCPClient, MCPToolAdapter
 
 console = Console()
 
 # Initialize skill loader
 skill_loader = SkillLoader()
+
+# Initialize MCP client
+mcp_client = MCPClient()
 
 # Provider configuration
 PROVIDER_CONFIG = {
@@ -98,13 +103,78 @@ def create_provider(provider_name: str, model: str = None) -> LLMProvider:
         raise click.Abort()
 
 
-def create_agent(provider_name: str, model: str = None, enable_tools: bool = False) -> AgentLoop:
+def load_mcp_config(config_path: str = None):
+    """Load MCP server configuration
+
+    Args:
+        config_path: Path to config file (default: mcp_config.json in project root)
+    """
+    if config_path is None:
+        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "mcp_config.json")
+
+    if not os.path.exists(config_path):
+        return
+
+    try:
+        with open(config_path, "r") as f:
+            config = json.load(f)
+
+        servers = config.get("mcpServers", {})
+        for name, server_config in servers.items():
+            command = server_config.get("command")
+            args = server_config.get("args", [])
+            env = server_config.get("env", {})
+
+            if command:
+                # Store for lazy loading
+                mcp_client.servers[name] = None  # Placeholder
+
+    except Exception as e:
+        console.print(f"[yellow]Warning: Failed to load MCP config: {e}[/yellow]")
+
+
+async def init_mcp_servers():
+    """Initialize MCP servers from config"""
+    config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "mcp_config.json")
+
+    if not os.path.exists(config_path):
+        return
+
+    try:
+        with open(config_path, "r") as f:
+            config = json.load(f)
+
+        servers = config.get("mcpServers", {})
+        for name, server_config in servers.items():
+            command = server_config.get("command")
+            args = server_config.get("args", [])
+            env = server_config.get("env", {})
+
+            if command:
+                console.print(f"[dim]Starting MCP server: {name}...[/dim]")
+                success = await mcp_client.add_server(name, command, args, env)
+                if success:
+                    console.print(f"[green]MCP server '{name}' started with {len(mcp_client.servers[name].tools)} tools[/green]")
+                else:
+                    console.print(f"[yellow]Warning: Failed to start MCP server '{name}'[/yellow]")
+
+    except Exception as e:
+        console.print(f"[yellow]Warning: Failed to initialize MCP servers: {e}[/yellow]")
+
+
+def create_agent(
+    provider_name: str,
+    model: str = None,
+    enable_tools: bool = False,
+    enable_mcp: bool = False,
+) -> AgentLoop:
     """Create Agent instance with configured provider and tools
 
     Args:
         provider_name: Provider name
         model: Model name (optional)
         enable_tools: Whether to enable tool calling
+        enable_mcp: Whether to enable MCP tools
 
     Returns:
         Configured AgentLoop instance
@@ -114,14 +184,30 @@ def create_agent(provider_name: str, model: str = None, enable_tools: bool = Fal
 
     # Create tools if enabled
     tools = None
-    if enable_tools:
+    if enable_tools or enable_mcp:
         tools = ToolRegistry()
-        tools.register("read_file", ReadFileTool())
-        tools.register("write_file", WriteFileTool())
-        tools.register("list_directory", ListDirectoryTool())
-        tools.register("shell", ShellTool())
 
-        console.print("[dim]Tools enabled: " + ", ".join(tools.tool_names) + "[/dim]")
+        # Register built-in tools
+        if enable_tools:
+            tools.register("read_file", ReadFileTool())
+            tools.register("write_file", WriteFileTool())
+            tools.register("list_directory", ListDirectoryTool())
+            tools.register("shell", ShellTool())
+
+        # Register MCP tools
+        if enable_mcp and mcp_client.tools:
+            for tool_name, mcp_tool in mcp_client.tools.items():
+                adapter = MCPToolAdapter(
+                    tool_name=mcp_tool.name,
+                    tool_description=mcp_tool.description,
+                    input_schema=mcp_tool.input_schema,
+                    mcp_client=mcp_client,
+                )
+                tools.register(tool_name, adapter)
+
+        tool_names = tools.tool_names
+        if tool_names:
+            console.print(f"[dim]Tools enabled: {', '.join(tool_names)}[/dim]")
 
     # Create agent
     system_prompt = """You are a helpful AI assistant. You can help with various tasks including:
@@ -129,6 +215,7 @@ def create_agent(provider_name: str, model: str = None, enable_tools: bool = Fal
 - Writing and editing code
 - Working with files
 - Executing commands
+- Using MCP tools for external integrations
 
 When using tools, explain what you're doing and why."""
 
@@ -142,7 +229,7 @@ When using tools, explain what you're doing and why."""
 
 
 @click.group()
-@click.version_option(version="0.3.0")
+@click.version_option(version="0.4.0")
 def cli():
     """My Agent - AI Agent with Agent Loop
 
@@ -155,8 +242,9 @@ def cli():
 @click.option("--provider", "-p", default="openai", help="LLM provider (openai, deepseek, anthropic, ollama)")
 @click.option("--model", "-m", default=None, help="Model to use (uses provider default if not specified)")
 @click.option("--enable-tools", "-t", is_flag=True, help="Enable tool calling")
+@click.option("--enable-mcp", is_flag=True, help="Enable MCP tools")
 @click.option("--stream", "-s", is_flag=True, help="Enable streaming output")
-def chat(provider: str, model: str, enable_tools: bool, stream: bool):
+def chat(provider: str, model: str, enable_tools: bool, enable_mcp: bool, stream: bool):
     """Start interactive chat mode"""
     console.print(
         Panel(
@@ -166,8 +254,12 @@ def chat(provider: str, model: str, enable_tools: bool, stream: bool):
         )
     )
 
+    # Initialize MCP if requested
+    if enable_mcp:
+        asyncio.run(init_mcp_servers())
+
     try:
-        agent = create_agent(provider, model, enable_tools)
+        agent = create_agent(provider, model, enable_tools, enable_mcp)
     except click.Abort:
         return
 
@@ -216,14 +308,19 @@ def chat(provider: str, model: str, enable_tools: bool, stream: bool):
 @click.option("--provider", "-p", default="openai", help="LLM provider (openai, deepseek, anthropic, ollama)")
 @click.option("--model", "-m", default=None, help="Model to use")
 @click.option("--enable-tools", "-t", is_flag=True, help="Enable tool calling")
+@click.option("--enable-mcp", is_flag=True, help="Enable MCP tools")
 @click.option("--stream", "-s", is_flag=True, help="Enable streaming output")
-def ask(prompt: str, provider: str, model: str, enable_tools: bool, stream: bool):
+def ask(prompt: str, provider: str, model: str, enable_tools: bool, enable_mcp: bool, stream: bool):
     """Execute a single query"""
     console.print(f"[bold blue]Query:[/bold blue] {prompt}")
     console.print(f"[dim]Provider: {provider} | Stream: {'on' if stream else 'off'}[/dim]\n")
 
+    # Initialize MCP if requested
+    if enable_mcp:
+        asyncio.run(init_mcp_servers())
+
     try:
-        agent = create_agent(provider, model, enable_tools)
+        agent = create_agent(provider, model, enable_tools, enable_mcp)
     except click.Abort:
         return
 
@@ -339,9 +436,43 @@ def run_skill(skill_name: str, task: str, provider: str, model: str, stream: boo
 
 
 @cli.command()
+def mcp_servers():
+    """List configured MCP servers"""
+    config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "mcp_config.json")
+
+    if not os.path.exists(config_path):
+        console.print("[yellow]No MCP configuration file found[/yellow]")
+        console.print("[dim]Create mcp_config.json in project root[/dim]")
+        return
+
+    try:
+        with open(config_path, "r") as f:
+            config = json.load(f)
+
+        servers = config.get("mcpServers", {})
+
+        if not servers:
+            console.print("[yellow]No MCP servers configured[/yellow]")
+            return
+
+        console.print("[bold]Configured MCP Servers:[/bold]\n")
+
+        for name, server_config in servers.items():
+            command = server_config.get("command", "")
+            args = server_config.get("args", [])
+            console.print(f"  [bold]{name}[/bold]")
+            console.print(f"    Command: {command} {' '.join(args)}")
+
+        console.print("\n[dim]Use --enable-mcp flag with chat/ask commands to enable MCP tools[/dim]")
+
+    except Exception as e:
+        console.print(f"[red]Error reading MCP config: {e}[/red]")
+
+
+@cli.command()
 def version():
     """Show version information"""
-    console.print("[bold]My Agent[/bold] v0.3.0")
+    console.print("[bold]My Agent[/bold] v0.4.0")
 
 
 if __name__ == "__main__":
