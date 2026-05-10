@@ -47,6 +47,8 @@ export ANTHROPIC_API_KEY="your-anthropic-key"
 
 ## Usage
 
+After installation, you can use the `agent` command directly (if not installed, use `python -m src.agent.main` instead):
+
 ```bash
 # List available providers
 agent providers
