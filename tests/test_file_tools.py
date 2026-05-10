@@ -2,12 +2,14 @@
 import asyncio
 import os
 import sys
+import pytest
 from src.agent.tools import ReadFileTool, WriteFileTool, ListDirectoryTool
 
 # 设置控制台编码
 sys.stdout.reconfigure(encoding='utf-8')
 
 
+@pytest.mark.asyncio
 async def test_write_and_read():
     """测试写入和读取文件"""
     write_tool = WriteFileTool()
@@ -33,6 +35,7 @@ async def test_write_and_read():
     print("[OK] 文件写入/读取测试通过")
 
 
+@pytest.mark.asyncio
 async def test_list_directory():
     """测试列出目录"""
     list_tool = ListDirectoryTool()
@@ -46,6 +49,7 @@ async def test_list_directory():
     print("[OK] 目录列出测试通过")
 
 
+@pytest.mark.asyncio
 async def test_read_nonexistent():
     """测试读取不存在的文件"""
     read_tool = ReadFileTool()

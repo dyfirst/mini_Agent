@@ -1,12 +1,14 @@
 """测试 Shell 工具"""
 import asyncio
 import sys
+import pytest
 from src.agent.tools import ShellTool
 
 # 设置控制台编码
 sys.stdout.reconfigure(encoding='utf-8')
 
 
+@pytest.mark.asyncio
 async def test_basic_command():
     """测试基本命令执行"""
     shell = ShellTool()
@@ -20,6 +22,7 @@ async def test_basic_command():
     print("[OK] 基本命令测试通过")
 
 
+@pytest.mark.asyncio
 async def test_list_command():
     """测试列表命令"""
     shell = ShellTool()
@@ -33,6 +36,7 @@ async def test_list_command():
     print("[OK] 列表命令测试通过")
 
 
+@pytest.mark.asyncio
 async def test_timeout():
     """测试命令超时"""
     shell = ShellTool(timeout=1)  # 1秒超时

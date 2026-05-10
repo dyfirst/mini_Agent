@@ -1,18 +1,23 @@
 """测试完整 Agent Loop"""
 import asyncio
 import os
+import sys
+import pytest
 from src.agent.agent_loop import AgentLoop
 from src.agent.providers.openai import OpenAIProvider
 from src.agent.tools import ToolRegistry, ReadFileTool, ListDirectoryTool, ShellTool
 
+# 设置控制台编码
+sys.stdout.reconfigure(encoding='utf-8')
 
+
+@pytest.mark.asyncio
 async def test_basic_agent():
     """测试基本 Agent 功能"""
     # 检查 API Key
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
-        print("⚠️  跳过测试：OPENAI_API_KEY 未设置")
-        return
+        pytest.skip("OPENAI_API_KEY 未设置")
 
     # 创建 Provider
     provider = OpenAIProvider(api_key=api_key, model="gpt-3.5-turbo")
@@ -30,15 +35,15 @@ async def test_basic_agent():
 
     assert "4" in response
 
-    print("✅ 基本 Agent 测试通过")
+    print("[OK] 基本 Agent 测试通过")
 
 
+@pytest.mark.asyncio
 async def test_agent_with_tools():
     """测试带工具的 Agent"""
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
-        print("⚠️  跳过测试：OPENAI_API_KEY 未设置")
-        return
+        pytest.skip("OPENAI_API_KEY 未设置")
 
     # 创建 Provider
     provider = OpenAIProvider(api_key=api_key, model="gpt-3.5-turbo")
@@ -63,10 +68,10 @@ async def test_agent_with_tools():
 
     assert "src" in response or "tests" in response
 
-    print("✅ Agent 工具调用测试通过")
+    print("[OK] Agent 工具调用测试通过")
 
 
 if __name__ == "__main__":
     asyncio.run(test_basic_agent())
     asyncio.run(test_agent_with_tools())
-    print("\n✅ 所有 Agent Loop 测试完成")
+    print("\n[OK] 所有 Agent Loop 测试完成")
