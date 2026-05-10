@@ -433,10 +433,10 @@ pip install pytest-asyncio
 
 ### 8.3 Git 相关
 
-- [ ] Git 仓库已初始化
-- [ ] 有多次有意义的提交
-- [ ] 提交信息使用英文
-- [ ] .gitignore 配置正确
+- [x] Git 仓库已初始化
+- [x] 有多次有意义的提交
+- [x] 提交信息使用英文
+- [x] .gitignore 配置正确
 
 ---
 
