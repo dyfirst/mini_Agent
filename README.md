@@ -2,6 +2,8 @@
 
 Custom AI Agent with Agent Loop implementation.
 
+English | [中文](README_CN.md)
+
 ## Features
 
 - CLI interface for interactive AI conversations
