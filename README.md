@@ -9,6 +9,7 @@ Custom AI Agent with Agent Loop implementation.
 - Streaming output (typewriter effect)
 - Skills system (predefined task templates)
 - MCP (Model Context Protocol) support for external tool servers
+- Vibe Coding mode (interactive code editing with AI)
 - Multiple LLM provider support (OpenAI, DeepSeek, Anthropic, Ollama)
 - File operations (read, write, list)
 - Shell command execution
@@ -76,6 +77,10 @@ agent mcp-servers
 
 # Chat with MCP tools enabled
 agent chat --provider deepseek --enable-mcp
+
+# Vibe Coding mode
+agent vibe --task "添加用户认证功能" --provider deepseek
+agent vibe --dir ./my-project --auto-apply
 ```
 
 ## Available Providers
@@ -223,6 +228,49 @@ agent ask "List files in /path" --provider deepseek --enable-mcp
 | `@modelcontextprotocol/server-brave-search` | Web search |
 | `@modelcontextprotocol/server-memory` | Knowledge graph |
 
+## Vibe Coding
+
+### What is Vibe Coding?
+
+Vibe Coding is an interactive code editing mode that lets you describe changes in natural language and have AI implement them for you.
+
+### How It Works
+
+```
+用户描述任务
+    ↓
+扫描项目结构
+    ↓
+收集相关文件作为上下文
+    ↓
+AI 生成代码修改
+    ↓
+应用到文件
+```
+
+### Usage
+
+```bash
+# Start Vibe Coding mode
+agent vibe --provider deepseek
+
+# With initial task
+agent vibe --task "添加用户认证功能" --provider deepseek
+
+# Specify project directory
+agent vibe --dir ./my-project --provider deepseek
+
+# Auto-apply changes without confirmation
+agent vibe --task "重构数据库模块" --provider deepseek --auto-apply
+```
+
+### Features
+
+- **Project Scanning**: Automatically scans project structure and languages
+- **Context Collection**: Collects relevant files as context for AI
+- **Interactive Editing**: Describe changes in natural language
+- **Auto-Apply**: Option to automatically apply changes
+
 ## Project Structure
 
 ```
@@ -248,9 +296,12 @@ my-agent/
 │   │       ├── coding.yml
 │   │       ├── file_ops.yml
 │   │       └── general.yml
-│   └── mcp/               # MCP support
-│       ├── client.py      # MCP client
-│       └── adapter.py     # MCP tool adapter
+│   ├── mcp/               # MCP support
+│   │   ├── client.py      # MCP client
+│   │   └── adapter.py     # MCP tool adapter
+│   └── vibe/              # Vibe Coding
+│       ├── scanner.py     # Project scanner
+│       └── editor.py      # Code editor
 ├── mcp_config.example.json # MCP configuration example
 ├── tests/                 # Unit tests
 ├── docs/                  # Documentation
